@@ -150,7 +150,7 @@ app.put("/api/auth/credentials", authenticateAdmin as any, async (req: Authentic
   }
 
   try {
-    const admin = await Admin.findById(req.admin?.id);
+    const admin = await Admin.findById(req.user?.id);
     if (!admin) {
       return res.status(404).json({ error: "Admin not found" });
     }
