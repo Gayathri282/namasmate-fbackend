@@ -9,7 +9,7 @@ import Setting from "./models/Setting";
 import Product from "./models/Product";
 import Order, { OrderStatus } from "./models/Order";
 import { authenticateAdmin, AuthenticatedRequest } from "./middleware/auth";
-import { sendOrderEmails, sendManualConfirmationEmail } from "./lib/email";
+import { sendOrderEmails, sendStatusUpdateEmail } from "./lib/email";
 
 // Load Environment Variables
 dotenv.config();
@@ -398,8 +398,28 @@ app.put("/api/orders/:id", authenticateAdmin as any, async (req: AuthenticatedRe
       return res.status(404).json({ error: "Order not found" });
     }
 
+    const previousStatus = order.status;
     order.status = status as OrderStatus;
     await order.save();
+
+    console.log(`[Order Update] ID: ${id} | Prev: ${previousStatus} | New: ${status}`);
+
+    // Automatically send status update email if status changed
+    if (previousStatus !== status) {
+      console.log(`[Order Update] Triggering status update email for order ${id}...`);
+      const product = await Product.findById(order.productId);
+      const productName = product ? product.name : "Premium Prayer Mat";
+      
+      try {
+        const result = await sendStatusUpdateEmail({ order, productName });
+        console.log(`[Order Update] Email result:`, result);
+      } catch (err) {
+        console.error("[Order Update] Failed to send automatic status update email:", err);
+      }
+    } else {
+      console.log(`[Order Update] Status did not change (${status}). No email sent.`);
+    }
+
     return res.json(order);
   } catch (error: any) {
     return res.status(500).json({ error: error.message });

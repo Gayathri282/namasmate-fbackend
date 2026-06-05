@@ -5,6 +5,7 @@ export enum OrderStatus {
   CONFIRMED = "Confirmed",
   SHIPPED = "Shipped",
   DELIVERED = "Delivered",
+  CANCELLED = "Cancelled",
 }
 
 export interface IOrder extends Document {
