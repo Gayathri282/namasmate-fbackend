@@ -143,6 +143,45 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
+app.put("/api/auth/credentials", authenticateAdmin as any, async (req: AuthenticatedRequest, res) => {
+  const { currentPassword, newEmail, newPassword } = req.body;
+  if (!currentPassword) {
+    return res.status(400).json({ error: "Current password is required to make changes" });
+  }
+
+  try {
+    const admin = await Admin.findById(req.admin?.id);
+    if (!admin) {
+      return res.status(404).json({ error: "Admin not found" });
+    }
+
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, admin.hashedPassword);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Incorrect current password" });
+    }
+
+    // Update email if provided
+    if (newEmail && newEmail !== admin.email) {
+      const existing = await Admin.findOne({ email: newEmail });
+      if (existing) {
+        return res.status(400).json({ error: "Email is already in use" });
+      }
+      admin.email = newEmail;
+    }
+
+    // Update password if provided
+    if (newPassword && newPassword.length > 0) {
+      admin.hashedPassword = await bcrypt.hash(newPassword, 10);
+    }
+
+    await admin.save();
+    return res.json({ message: "Credentials updated successfully. Please log in again." });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // 2. SETTINGS ROUTES
 // ---------------------------------------------------------------------------
@@ -193,7 +232,7 @@ app.get("/api/products", async (req, res) => {
 });
 
 app.post("/api/products", authenticateAdmin as any, async (req: AuthenticatedRequest, res) => {
-  const { name, description, price, shippingCharge, images, videos, video, variants, isActive } = req.body;
+  const { name, description, price, salePrice, shippingCharge, images, videos, video, variants, isActive } = req.body;
   if (!name || !description || price === undefined) {
     return res.status(400).json({ error: "Name, description and price are required" });
   }
@@ -207,6 +246,7 @@ app.post("/api/products", authenticateAdmin as any, async (req: AuthenticatedReq
       name,
       description,
       price: Number(price),
+      salePrice: salePrice !== undefined ? Number(salePrice) : 0,
       shippingCharge: shippingCharge !== undefined ? Number(shippingCharge) : 0,
       images: images || [],
       videos: videosArray,
@@ -232,6 +272,7 @@ app.put("/api/products/:id", authenticateAdmin as any, async (req: Authenticated
     product.name = body.name ?? product.name;
     product.description = body.description ?? product.description;
     product.price = body.price !== undefined ? Number(body.price) : product.price;
+    product.salePrice = body.salePrice !== undefined ? Number(body.salePrice) : (product.salePrice ?? 0);
     product.shippingCharge = body.shippingCharge !== undefined ? Number(body.shippingCharge) : product.shippingCharge;
     product.images = body.images ?? product.images;
     product.videos = body.videos ?? product.videos;
